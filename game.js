@@ -3,18 +3,19 @@ var Game = {
     map: {},
     engine: null,
     player: null,
+    monsters: [],
+    scheduler: null,
 
     init: function() {
         this.display = new ROT.Display();
         document.body.appendChild(this.display.getContainer());
+        this.scheduler = new ROT.Scheduler.Simple();
+        this.engine = new ROT.Engine(this.scheduler);
 
         this._generateMap();
         this._redrawMap();
 
-        var scheduler = new ROT.Scheduler.Simple();
-        scheduler.add(this.player, true);
 
-        this.engine = new ROT.Engine(scheduler);
         this.engine.start();
     },
 
@@ -47,14 +48,29 @@ var Game = {
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
         ]
         this._createPlayer(5,5);
+        this._createMonster(7,7);
     },
 
     _createPlayer: function(x, y) {
         this.player = new Player(x, y);
+        this.scheduler.add(this.player, true);
+    },
+
+    _createMonster: function(x,y) {
+        var monster = new Monster(x,y);
+        this.monsters.push(monster);
+        this.scheduler.add(monster, true);
     },
 
     // This is for drawing terrain etc.
     drawMapTileAt: function(x,y) {
+        for(var i = 0; i < this.monsters.length; i+= 1) {
+            if (this.monsters[i].isAt(x,y)) {
+                this.monsters[i]._draw();
+                return;
+            }
+        }
+
         var tileIntToCharacter = [
             [['.', '#f99', '#000'],['#', '#f99', '#000']],
             [[' ', '#000', '#99f'],['^', '#000', '#99f']],
@@ -87,6 +103,25 @@ var Game = {
         this.player._draw();
     }
 };
+
+var Monster = function(x, y) {
+    this._x = x;
+    this._y = y;
+}
+
+Monster.prototype.act = function() {
+    console.log("Monster is acting!");
+}
+
+Monster.prototype._draw = function() {
+    Game.drawCharacterByWorld(this._x, this._y, "m", "#fff", "#000",
+                                                "M", "#000", "#fff");
+    // Game.drawCharacterAt(this._x, this._y, "@", "#ff0");
+}
+
+Monster.prototype.isAt = function(x,y) {
+    return x == this._x && y == this._y;
+}
 
 var Player = function(x, y) {
     this._x = x;
