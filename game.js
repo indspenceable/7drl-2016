@@ -6,15 +6,21 @@ var Game = {
     monsters: [],
     scheduler: null,
     currentWorld: 0,
+    messages: ["Back log of messages!", "Which we should show"],
 
     init: function() {
-        this.display = new ROT.Display();
+        this.display = new ROT.Display({
+            // forceSquareRatio:true,
+            // spacing:0.75,
+        });
         document.body.appendChild(this.display.getContainer());
         this.scheduler = new ROT.Scheduler.Simple();
         this.engine = new ROT.Engine(this.scheduler);
 
         this._generateMap();
         this._redrawMap();
+        this._drawMapUIDivider();
+        this._drawUI();
 
 
         this.engine.start();
@@ -46,6 +52,14 @@ var Game = {
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
         ]
         this._createPlayer(5,5);
@@ -91,6 +105,7 @@ var Game = {
     },
 
     killMonster: function(monster) {
+        this.scheduler.remove(monster);
         var index = this.monsters.indexOf(monster);
         if (index >= 0) {
             this.monsters.splice(index, 1);
@@ -120,6 +135,60 @@ var Game = {
         this.player._draw();
     },
 
+    _drawMapUIDivider: function() {
+        var x = 45;
+        for (var y = 0; y < 25; y+=1) {
+            this.display.draw(x, y, "|");
+        }
+    },
+
+    _drawUI: function() {
+        var x = 46;
+        var y = 0;
+        var worldName = this.currentWorld == 0 ? "Primary" : "Subspace";
+        this.display.drawText(x, y, "World: " + worldName);
+        y+=1;
+        this.display.drawText(x, y, "Status: healthy")
+        y+=1;
+        y+=1;
+        y+=1;
+        y+=1;
+        y+=1;
+        y+=1;
+        y+=1;
+        this._clearAndDrawMessageLog();
+    },
+
+    _clearAndDrawMessageLog: function() {
+        var x = 46;
+        var y = 15;
+        var width = 80-46;
+        var height = 25-15;
+
+        var index = this.messages.length;
+
+        this.display.drawText(x, y, Array(width).join("-"), "#000", "#000");
+        y+=1
+        for (var i = 0; i < height-1; i+=1) {
+            // clear the line
+            for (var j = 0; j < width; j+=1) {
+                this.display.draw(x+j, y, " ");
+            }
+
+            index -= 1;
+            if (index >= 0) {
+                // Draw this message
+                this.display.drawText(x, y, this.messages[index])
+            }
+            y+=1;
+        }
+    },
+
+    logMessage: function(message) {
+        this.messages.push(message);
+        this._clearAndDrawMessageLog();
+    },
+
     swapWorld: function() {
         this.currentWorld += 1;
         this.currentWorld %= 2;
@@ -134,7 +203,7 @@ var Monster = function(x, y, hp) {
 }
 
 Monster.prototype.act = function() {
-    console.log("Monster is acting!");
+    Game.logMessage("The monster is acting!");
 }
 
 Monster.prototype._draw = function() {
@@ -149,6 +218,7 @@ Monster.prototype.isAt = function(x,y) {
 Monster.prototype.takeHit = function(damage) {
     this._hp -= damage;
     if (this._hp <= 0) {
+        Game.logMessage("The monster dies!");
         Game.killMonster(this);
     }
 }
@@ -208,7 +278,7 @@ Player.prototype._doMovement = function(newX, newY) {
 
 Player.prototype._doAttack = function(monster) {
     monster.takeHit(1);
-    console.log("attaking");
+    Game.logMessage("You hit the monster!");
     window.removeEventListener("keydown", this);
     Game.engine.unlock();
 }
