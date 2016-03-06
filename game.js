@@ -5,6 +5,7 @@ var Game = {
     player: null,
     monsters: [],
     scheduler: null,
+    currentWorld: 0,
 
     init: function() {
         this.display = new ROT.Display();
@@ -74,7 +75,7 @@ var Game = {
             [['.', '#f99', '#000'],['#', '#f99', '#000']],
             [[' ', '#000', '#99f'],['^', '#000', '#99f']],
         ]
-        var chrMap = tileIntToCharacter[this.player.currentWorld]
+        var chrMap = tileIntToCharacter[this.currentWorld]
         var chrData = chrMap[this.map[y][x]];
         // Draw the tile correctly, accounting for which world we're in.
         this.display.draw(x, y, chrData[0], chrData[1], chrData[2]);
@@ -82,7 +83,7 @@ var Game = {
 
     // This is for drawing the player + enemies etc.
     drawCharacterByWorld: function(x, y, chr1, fg1, bg1, chr2, fg2, bg2) {
-        if (this.player.currentWorld == 0) {
+        if (this.currentWorld == 0) {
             this.display.draw(x, y, chr1, fg1, bg1);
         } else {
             this.display.draw(x, y, chr2, fg2, bg2);
@@ -117,6 +118,12 @@ var Game = {
     _redrawMap: function() {
         this._drawWholeMap();
         this.player._draw();
+    },
+
+    swapWorld: function() {
+        this.currentWorld += 1;
+        this.currentWorld %= 2;
+        this._redrawMap();
     }
 };
 
@@ -149,9 +156,6 @@ Monster.prototype.takeHit = function(damage) {
 var Player = function(x, y) {
     this._x = x;
     this._y = y;
-    // this._draw();
-    // Current world is either 0 or 1.
-    this.currentWorld = 0;
 }
 
 Player.prototype.act = function() {
@@ -176,7 +180,7 @@ Player.prototype.handleEvent = function(e) {
         this._attemptMovement(ROT.DIRS[8][movementKeymap[code]]);
     } else if (e.keyCode == 32) {
         // Spacebar
-        this._swapWorld();
+        Game.swapWorld();
     }
 }
 
@@ -212,11 +216,4 @@ Player.prototype._doAttack = function(monster) {
 Player.prototype._draw = function() {
     Game.drawCharacterByWorld(this._x, this._y, "@", "#fff", "#000",
                                                 "@", "#000", "#fff");
-    // Game.drawCharacterAt(this._x, this._y, "@", "#ff0");
-}
-
-Player.prototype._swapWorld = function() {
-    this.currentWorld += 1;
-    this.currentWorld %= 2;
-    Game._redrawMap();
 }
