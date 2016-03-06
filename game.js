@@ -19,7 +19,7 @@ var Game = {
         this.engine.start();
     },
 
-    openSpace: function(x, y) {
+    walkableSpace: function(x, y) {
         return this.map[y][x] == 0;
     },
 
@@ -48,7 +48,7 @@ var Game = {
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
         ]
         this._createPlayer(5,5);
-        this._createMonster(7,7);
+        this._createMonster(7,7,3);
     },
 
     _createPlayer: function(x, y) {
@@ -56,19 +56,18 @@ var Game = {
         this.scheduler.add(this.player, true);
     },
 
-    _createMonster: function(x,y) {
-        var monster = new Monster(x,y);
+    _createMonster: function(x,y,hp) {
+        var monster = new Monster(x,y,hp);
         this.monsters.push(monster);
         this.scheduler.add(monster, true);
     },
 
     // This is for drawing terrain etc.
     drawMapTileAt: function(x,y) {
-        for(var i = 0; i < this.monsters.length; i+= 1) {
-            if (this.monsters[i].isAt(x,y)) {
-                this.monsters[i]._draw();
-                return;
-            }
+        var m = this.monsterAt(x,y);
+        if (m !== undefined) {
+            m._draw();
+            return;
         }
 
         var tileIntToCharacter = [
@@ -90,6 +89,23 @@ var Game = {
         }
     },
 
+    killMonster: function(monster) {
+        var index = this.monsters.indexOf(monster);
+        if (index >= 0) {
+            this.monsters.splice(index, 1);
+        }
+        this.drawMapTileAt(monster._x, monster._y);
+    },
+
+    monsterAt: function(x,y) {
+       for(var i = 0; i < this.monsters.length; i+= 1) {
+            if (this.monsters[i].isAt(x,y)) {
+                return this.monsters[i];
+            }
+        }
+        return undefined;
+    },
+
     _drawWholeMap: function() {
         for (var y = 0; y < this.map.length; y++) {
             for (var x = 0; x < this.map[0].length; x++) {
@@ -104,9 +120,10 @@ var Game = {
     }
 };
 
-var Monster = function(x, y) {
+var Monster = function(x, y, hp) {
     this._x = x;
     this._y = y;
+    this._hp = hp;
 }
 
 Monster.prototype.act = function() {
@@ -116,11 +133,17 @@ Monster.prototype.act = function() {
 Monster.prototype._draw = function() {
     Game.drawCharacterByWorld(this._x, this._y, "m", "#fff", "#000",
                                                 "M", "#000", "#fff");
-    // Game.drawCharacterAt(this._x, this._y, "@", "#ff0");
 }
 
 Monster.prototype.isAt = function(x,y) {
     return x == this._x && y == this._y;
+}
+
+Monster.prototype.takeHit = function(damage) {
+    this._hp -= damage;
+    if (this._hp <= 0) {
+        Game.killMonster(this);
+    }
 }
 
 var Player = function(x, y) {
@@ -150,26 +173,38 @@ Player.prototype.handleEvent = function(e) {
     var code = e.keyCode;
     /* one of numpad directions? */
     if ((code in movementKeymap)) {
-        this._doMovement(ROT.DIRS[8][movementKeymap[code]]);
+        this._attemptMovement(ROT.DIRS[8][movementKeymap[code]]);
     } else if (e.keyCode == 32) {
         // Spacebar
         this._swapWorld();
     }
 }
 
-Player.prototype._doMovement = function(dir) {
+Player.prototype._attemptMovement = function(dir) {
     /* is there a free space? */
     var newX = this._x + dir[0];
     var newY = this._y + dir[1];
-    if (! Game.openSpace(newX, newY)) {
-        return;
-    }
 
-    // Game.display.draw(this._x, this._y, Game.getTile(this._x, this._y));
+    var monster = Game.monsterAt(newX, newY)
+    if (monster !== undefined) {
+        this._doAttack(monster);
+    } else if (Game.walkableSpace(newX, newY)) {
+        this._doMovement(newX, newY)
+    }
+}
+
+Player.prototype._doMovement = function(newX, newY) {
     Game.drawMapTileAt(this._x, this._y);
     this._x = newX;
     this._y = newY;
     this._draw();
+    window.removeEventListener("keydown", this);
+    Game.engine.unlock();
+}
+
+Player.prototype._doAttack = function(monster) {
+    monster.takeHit(1);
+    console.log("attaking");
     window.removeEventListener("keydown", this);
     Game.engine.unlock();
 }
