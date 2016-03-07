@@ -13,7 +13,7 @@ var Game = {
             // forceSquareRatio:true,
             // spacing:0.75,
         });
-        document.body.appendChild(this.display.getContainer());
+        document.getElementById("game").appendChild(this.display.getContainer());
         this.scheduler = new ROT.Scheduler.Simple();
         this.engine = new ROT.Engine(this.scheduler);
 
