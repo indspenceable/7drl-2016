@@ -247,8 +247,10 @@ Player.prototype.handleEvent = function(e) {
     var code = e.keyCode;
     /* one of numpad directions? */
     if ((code in movementKeymap)) {
+        event.preventDefault()
         this._attemptMovement(ROT.DIRS[8][movementKeymap[code]]);
     } else if (e.keyCode == 32) {
+        event.preventDefault()
         // Spacebar
         Game.swapWorld();
     }
