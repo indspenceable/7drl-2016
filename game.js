@@ -3,10 +3,11 @@ var Game = {
     map: {},
     engine: null,
     player: null,
-    monsters: [],
+    entities: [],
     scheduler: null,
     currentWorld: 0,
     messages: ["Back log of messages!", "Which we should show"],
+    maxHp: 22,
 
     init: function() {
         this.display = new ROT.Display({
@@ -22,12 +23,27 @@ var Game = {
         this._drawMapUIDivider();
         this._drawUI();
 
-
         this.engine.start();
     },
 
-    walkableSpace: function(x, y) {
+    walkableSpaceByTerrain: function(x, y) {
         return this.map[y][x] == 0;
+    },
+
+    findPathTo: function(start, end) {
+        var path = [];
+        var passableCallback = function(x,y) {
+            var monsterAtSpace = Game.monsterAt(x,y)
+            return ((monsterAtSpace === undefined) ||
+                    (monsterAtSpace === start) ||
+                    (monsterAtSpace === end)) &&
+                    Game.walkableSpaceByTerrain(x,y);
+        }
+        var astar = new ROT.Path.AStar(start._x, start._y, passableCallback, {topology: 4});
+        astar.compute(end._x, end._y, function(x,y) {
+            path.push([x,y]);
+        });
+        return path;
     },
 
     getTile: function(x, y) {
@@ -36,31 +52,31 @@ var Game = {
 
     _generateMap: function() {
         this.map = [
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
-            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
-            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1],
-            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
         ]
         this._createPlayer(5,5);
         this._createMonster(7,7,3);
@@ -68,13 +84,14 @@ var Game = {
     },
 
     _createPlayer: function(x, y) {
-        this.player = new Player(x, y);
+        this.player = new Player(x, y, this.maxHp);
+        this.entities.push(this.player);
         this.scheduler.add(this.player, true);
     },
 
     _createMonster: function(x,y,hp) {
         var monster = new Monster(x,y,hp);
-        this.monsters.push(monster);
+        this.entities.push(monster);
         this.scheduler.add(monster, true);
     },
 
@@ -107,17 +124,17 @@ var Game = {
 
     killMonster: function(monster) {
         this.scheduler.remove(monster);
-        var index = this.monsters.indexOf(monster);
+        var index = this.entities.indexOf(monster);
         if (index >= 0) {
-            this.monsters.splice(index, 1);
+            this.entities.splice(index, 1);
         }
         this.drawMapTileAt(monster._x, monster._y);
     },
 
     monsterAt: function(x,y) {
-       for(var i = 0; i < this.monsters.length; i+= 1) {
-            if (this.monsters[i].isAt(x,y)) {
-                return this.monsters[i];
+       for(var i = 0; i < this.entities.length; i+= 1) {
+            if (this.entities[i].isAt(x,y)) {
+                return this.entities[i];
             }
         }
         return undefined;
@@ -137,21 +154,31 @@ var Game = {
     },
 
     _drawMapUIDivider: function() {
-        var x = 45;
+        var x = 55;
         for (var y = 0; y < 25; y+=1) {
             this.display.draw(x, y, "|");
         }
     },
 
     _drawUI: function() {
-        var x = 46;
+        var x = 56;
         var y = 0;
-        var worldName = this.currentWorld == 0 ? "Primary" : "Subspace";
+        var width = 80-56;
+        var height = 25;
+
+        var worldName = this.currentWorld == 0 ? "Badlands" : "Subspace";
         this.display.drawText(x, y, "World: " + worldName);
         y+=1;
-        this.display.drawText(x, y, "Status: healthy")
+        for (var j = 0; j < width; j+=1) {
+            this.display.draw(x+j, y, " ");
+        }
+
+        this.display.drawText(x, y, "" + this.player._hp + "/" + this.maxHp);
         y+=1;
-        y+=1;
+        this.display.drawText(x, y, "[" +
+            Array(this.player._hp).join("=") +
+            Array(this.maxHp - this.player._hp+1).join(" ") +
+            "]", "#000", "#000");
         y+=1;
         y+=1;
         y+=1;
@@ -161,9 +188,9 @@ var Game = {
     },
 
     _clearAndDrawMessageLog: function() {
-        var x = 46;
+        var x = 56;
         var y = 15;
-        var width = 80-46;
+        var width = 80-56;
         var height = 25-15;
 
         var index = this.messages.length;
@@ -197,14 +224,37 @@ var Game = {
     }
 };
 
+var ThingInATile = function(x, y, hp) {
+    this._x = x;
+    this._y = y;
+    this._hp = hp;
+}
+
 var Monster = function(x, y, hp) {
     this._x = x;
     this._y = y;
     this._hp = hp;
 }
 
+Monster.prototype = new ThingInATile();
+
 Monster.prototype.act = function() {
-    Game.logMessage("The monster is acting!");
+    path = Game.findPathTo(Game.player, this);
+    if (path.length <= 1) {
+        //No path! Ignore
+    } else if (path.length == 2) {
+        Game.logMessage("Monster attacks!");
+        Game.player.takeHit(1);
+    } else {
+        var oldX = this._x;
+        var oldY = this._y;
+        console.log(path);
+        var xy = path[1];
+        this._x = xy[0];
+        this._y = xy[1]
+        Game.drawMapTileAt(oldX, oldY);
+        this._draw();
+    }
 }
 
 Monster.prototype._draw = function() {
@@ -212,22 +262,28 @@ Monster.prototype._draw = function() {
                                                 "M", "#000", "#fff");
 }
 
-Monster.prototype.isAt = function(x,y) {
+ThingInATile.prototype.isAt = function(x,y) {
     return x == this._x && y == this._y;
 }
 
-Monster.prototype.takeHit = function(damage) {
+ThingInATile.prototype.takeHit = function(damage) {
     this._hp -= damage;
     if (this._hp <= 0) {
-        Game.logMessage("The monster dies!");
-        Game.killMonster(this);
+        this.die()
     }
 }
 
-var Player = function(x, y) {
+Monster.prototype.die = function() {
+    Game.killMonster(this);
+}
+
+var Player = function(x, y, hp) {
     this._x = x;
     this._y = y;
+    this._hp = hp;
 }
+
+Player.prototype = new ThingInATile();
 
 Player.prototype.act = function() {
     Game.engine.lock();
@@ -254,6 +310,9 @@ Player.prototype.handleEvent = function(e) {
         event.preventDefault()
         // Spacebar
         Game.swapWorld();
+        Game._drawUI();
+        window.removeEventListener("keydown", this);
+        Game.engine.unlock();
     }
 }
 
@@ -265,18 +324,26 @@ Player.prototype._attemptMovement = function(dir) {
     var monster = Game.monsterAt(newX, newY)
     if (monster !== undefined) {
         this._doAttack(monster);
-    } else if (Game.walkableSpace(newX, newY)) {
+    } else if (Game.walkableSpaceByTerrain(newX, newY)) {
         this._doMovement(newX, newY)
     }
 }
 
 Player.prototype._doMovement = function(newX, newY) {
-    Game.drawMapTileAt(this._x, this._y);
+    var oldX = this._x;
+    var oldY = this._y;
     this._x = newX;
     this._y = newY;
+    Game.drawMapTileAt(oldX, oldY);
     this._draw();
     window.removeEventListener("keydown", this);
     Game.engine.unlock();
+}
+
+Player.prototype.takeHit = function(damage) {
+    var rtn = ThingInATile.prototype.takeHit.call(this, damage);
+    Game._drawUI();
+    return rtn;
 }
 
 Player.prototype._doAttack = function(monster) {
