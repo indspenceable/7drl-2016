@@ -26,10 +26,6 @@ var Game = {
         this.engine.start();
     },
 
-    walkableSpaceByTerrain: function(x, y) {
-        return this.map[y][x] != 1;
-    },
-
     findPathTo: function(start, end) {
         var path = [];
         var passableCallback = function(x,y) {
@@ -37,7 +33,7 @@ var Game = {
             return ((monsterAtSpace === undefined) ||
                     (monsterAtSpace === start) ||
                     (monsterAtSpace === end)) &&
-                    Game.walkableSpaceByTerrain(x,y);
+                    Game.getTile(x,y).isWalkable();
         }
         var astar = new ROT.Path.AStar(start._x, start._y, passableCallback, {topology: 4});
         astar.compute(end._x, end._y, function(x,y) {
@@ -48,20 +44,6 @@ var Game = {
 
     getTile: function(x, y) {
         return this.map[y][x];
-    },
-
-    triggerTerrainForPlayer: function() {
-        switch(this.getTile(this.player._x, this.player._y)) {
-            case 2:
-                if (this.currentWorld == 0) {
-                    this.logMessage("the lava singes you!");
-                    this.player.takeHit(1);
-                } else {
-                    this.logMessage("You're bogged down in the slime!")
-                    this.player.delay += 1;
-                }
-            break;
-        }
     },
 
     _generateMap: function() {
@@ -92,6 +74,11 @@ var Game = {
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
         ]
+        for (var y = 0; y < this.map.length; y+=1) {
+            for (var x = 0; x < this.map[0].length; x+=1) {
+                this.map[y][x] = new Tile(x, y, this.map[y][x]);
+            }
+        }
         this._createPlayer(20,5);
         this._createMonster(7,7,3);
         this._createMonster(10,5,5);
@@ -117,14 +104,7 @@ var Game = {
             return;
         }
 
-        var tileIntToCharacter = [
-            [['.', '#f99', '#000'], ['#', '#f99', '#000'], ['~', '#f99', '#922']],
-            [[' ', '#000', '#99f'], ['U', '#000', '#99f'], ['~', '#9f9', '#99f']],
-        ]
-        var chrMap = tileIntToCharacter[this.currentWorld]
-        var chrData = chrMap[this.map[y][x]];
-        // Draw the tile correctly, accounting for which world we're in.
-        this.display.draw(x, y, chrData[0], chrData[1], chrData[2]);
+        this.getTile(x,y).draw();
     },
 
     // This is for drawing the player + enemies etc.
@@ -238,6 +218,41 @@ var Game = {
     }
 };
 
+var Tile = function(x,y,terrain) {
+    this.x = x;
+    this.y = y;
+    this.terrain = terrain;
+}
+
+Tile.prototype.draw = function() {
+    var world1Tiles = [['.', '#f99', '#000'], ['#', '#f99', '#000'], ['~', '#f99', '#922']][this.terrain];
+    var world2Tiles = [[' ', '#000', '#99f'], ['U', '#000', '#99f'], ['~', '#9f9', '#99f']][this.terrain];
+
+    // Draw the tile correctly, accounting for which world we're in.
+    // Game.display.draw(x, y, chrData[0], chrData[1], chrData[2]);
+
+    Game.drawCharacterByWorld(this.x, this.y, world1Tiles[0], world1Tiles[1], world1Tiles[2],
+                                              world2Tiles[0], world2Tiles[1], world2Tiles[2]);
+}
+
+Tile.prototype.isWalkable = function() {
+    return this.terrain != 1;
+}
+
+Tile.prototype.trigger = function() {
+    switch(this.terrain) {
+        case 2:
+            if (Game.currentWorld == 0) {
+                Game.logMessage("the lava singes you!");
+                Game.player.takeHit(1);
+            } else {
+                Game.logMessage("You're bogged down in the slime!")
+                Game.player.delay += 1;
+            }
+        break;
+    }
+}
+
 var ThingInATile = function(x, y, hp) {
     this._x = x;
     this._y = y;
@@ -343,7 +358,7 @@ Player.prototype._attemptMovement = function(dir) {
     var monster = Game.monsterAt(newX, newY)
     if (monster !== undefined) {
         this._doAttack(monster);
-    } else if (Game.walkableSpaceByTerrain(newX, newY)) {
+    } else if (Game.getTile(newX, newY).isWalkable()) {
         this._doMovement(newX, newY)
     }
 }
@@ -356,7 +371,7 @@ Player.prototype._doMovement = function(newX, newY) {
     Game.drawMapTileAt(oldX, oldY);
     this._draw();
 
-    Game.triggerTerrainForPlayer();
+    Game.getTile(this._x, this._y).trigger();
 
     window.removeEventListener("keydown", this);
     Game.engine.unlock();
