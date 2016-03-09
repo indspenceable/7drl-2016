@@ -393,6 +393,13 @@ Gargoyle.prototype._draw = function() {
     Game.drawCharacterByWorld(this._x, this._y, "o", "#333", "#aaa",
                                                 "8", "#aaa", "#333");
 }
+Gargoyle.prototype.takeHit = function(damage) {
+    if (Game.currentWorld == 0) {
+        return ThingInATile.prototype.takeHit.call(this, damage);
+    } else {
+        Game.logMessage("Hitting the statue does nothing.");
+    }
+}
 
 var Player = function(x, y, hp) {
     this._x = x;
