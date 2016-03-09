@@ -52,8 +52,8 @@ var Game = {
             [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,0,2,0,0,0,0,0,2,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,0,0,0,0,2,0,0,2,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,2,2,2,2,2,2,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,0,2,2,2,2,2,2,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,0,0,0,0,2,0,0,2,0,0,0,0,2,0,0,0,0,0,0,0,0,0,3,0,2,2,2,2,2,2,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,0,0,0,0,0,0,0,0,2,2,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
@@ -212,9 +212,12 @@ var Game = {
     },
 
     swapWorld: function() {
-        this.currentWorld += 1;
-        this.currentWorld %= 2;
+        this.currentWorld = this.otherWorld();
         this._redrawMap();
+    },
+
+    otherWorld: function() {
+        return (this.currentWorld + 1)%2;
     }
 };
 
@@ -225,8 +228,18 @@ var Tile = function(x,y,terrain) {
 }
 
 Tile.prototype.draw = function() {
-    var world1Tiles = [['.', '#f99', '#000'], ['#', '#f99', '#000'], ['~', '#f99', '#922']][this.terrain];
-    var world2Tiles = [[' ', '#000', '#99f'], ['U', '#000', '#99f'], ['~', '#9f9', '#99f']][this.terrain];
+    var world1Tiles = [
+        ['.', '#f99', '#000'],
+        ['#', '#f99', '#000'],
+        ['~', '#f99', '#922'],
+        ['_', '#555', '#000']
+    ][this.terrain];
+    var world2Tiles = [
+        [' ', '#000', '#99f'],
+        ['U', '#000', '#99f'],
+        ['~', '#9f9', '#99f'],
+        [' ', '#fff', '#222']
+    ][this.terrain];
 
     // Draw the tile correctly, accounting for which world we're in.
     // Game.display.draw(x, y, chrData[0], chrData[1], chrData[2]);
@@ -235,8 +248,11 @@ Tile.prototype.draw = function() {
                                               world2Tiles[0], world2Tiles[1], world2Tiles[2]);
 }
 
-Tile.prototype.isWalkable = function() {
-    return this.terrain != 1;
+Tile.prototype.isWalkable = function(world) {
+    if (world === undefined) {
+        world = Game.currentWorld;
+    }
+    return this.terrain == 0 || this.terrain == 2 || (this.terrain == 3 && world == 0);
 }
 
 Tile.prototype.trigger = function() {
@@ -275,15 +291,25 @@ Monster.prototype.act = function() {
         Game.logMessage("Monster attacks!");
         Game.player.takeHit(1);
     } else {
-        var oldX = this._x;
-        var oldY = this._y;
-        console.log(path);
-        var xy = path[1];
-        this._x = xy[0];
-        this._y = xy[1]
-        Game.drawMapTileAt(oldX, oldY);
-        this._draw();
+        this.stepTowardsPlayer(path);
     }
+}
+
+Monster.prototype.stepTowardsPlayer = function(path) {
+    if (path === undefined) {
+        path = Game.findPathTo(Game.player, this);
+    }
+    if (path.length < 3) {
+        return;
+    }
+    var oldX = this._x;
+    var oldY = this._y;
+
+    var xy = path[1];
+    this._x = xy[0];
+    this._y = xy[1]
+    Game.drawMapTileAt(oldX, oldY);
+    this._draw();
 }
 
 Monster.prototype._draw = function() {
@@ -340,14 +366,26 @@ Player.prototype.handleEvent = function(e) {
     if ((code in movementKeymap)) {
         event.preventDefault()
         this._attemptMovement(ROT.DIRS[8][movementKeymap[code]]);
+    } else if (e.keyCode == 190) {
+        // . (wait)
+        window.removeEventListener("keydown", this);
+        Game.engine.unlock();
     } else if (e.keyCode == 32) {
         event.preventDefault()
-        // Spacebar
+        // Spacebar (worldswap)
+        if (!this.canSwapWorld()) {
+            Game.logMessage("You're unable to phase to the other world in this location.")
+            return;
+        }
         Game.swapWorld();
         Game._drawUI();
         window.removeEventListener("keydown", this);
         Game.engine.unlock();
     }
+}
+
+Player.prototype.canSwapWorld = function() {
+    return Game.getTile(this._x, this._y).isWalkable(Game.otherWorld());
 }
 
 Player.prototype._attemptMovement = function(dir) {
