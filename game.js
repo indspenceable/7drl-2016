@@ -83,6 +83,7 @@ var Game = {
         this._createMonster(7,7,3, Shade);
         this._createMonster(10,5,5, Mutant);
         this._createMonster(30,5,5, Gargoyle);
+        this._createMonster(3,5,5, Bowyer);
     },
 
     _createPlayer: function(x, y) {
@@ -399,6 +400,34 @@ Gargoyle.prototype.takeHit = function(damage) {
     } else {
         Game.logMessage("Hitting the statue does nothing.");
     }
+}
+
+// TODO - a bombomb that runs towards/away from you depending on the world.
+
+var Bowyer = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
+Bowyer.prototype = new ThingInATile();
+
+Bowyer.prototype.act = function() {
+    var range = (Game.currentWorld == 1) ? 1 : 5;
+    var path = Game.findPathTo(Game.player, this);
+    if (path.length <= 1) {
+        //No path! Ignore
+    } else if (path.length <= range+1) {
+        if (Game.currentWorld == 0) {
+            Game.logMessage("The Bowyer shoots an arrow at you from afar!");
+            Game.player.takeHit(1);
+        } else {
+            Game.logMessage("The Bowyer hits you w/ his bow");
+            Game.player.takeHit(1);
+        }
+    } else {
+        this.stepTowardsPlayer(path);
+    }
+}
+
+Bowyer.prototype._draw = function() {
+    Game.drawCharacterByWorld(this._x, this._y, "}", "#39a", "#222",
+                                                ")", "#a93", "#222");
 }
 
 var Player = function(x, y, hp) {
