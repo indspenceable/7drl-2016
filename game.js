@@ -7,7 +7,7 @@ var Game = {
     scheduler: null,
     currentWorld: 0,
     messages: ["Back log of messages!", "Which we should show"],
-    maxHp: 22,
+    maxHp: 15,
 
     init: function() {
         this.display = new ROT.Display({
@@ -169,16 +169,25 @@ var Game = {
 
         this.display.drawText(x, y, "" + this.player._hp + "/" + this.maxHp);
         y+=1;
-        this.display.drawText(x, y, "[" +
-            Array(this.player._hp).join("=") +
-            Array(this.maxHp - this.player._hp+1).join(" ") +
-            "]", "#000", "#000");
+        this._drawMeter(x, y, this.player._hp, this.maxHp, "Hp");
         y+=1;
+        this._drawMeter(x, y, this.player.sickness, 5, "sickness");
         y+=1;
         y+=1;
         y+=1;
         y+=1;
         this._clearAndDrawMessageLog();
+    },
+
+    _drawMeter: function(x, y, current, max, meterName) {
+        if (current > max) {
+            current = max;
+        }
+
+        this.display.drawText(x, y, "[" +
+            Array(current+1).join("=") +
+            Array(max - current + 1).join(" ") +
+            "]", "#000", "#000");
     },
 
     _clearAndDrawMessageLog: function() {
@@ -337,16 +346,17 @@ var Player = function(x, y, hp) {
     this._y = y;
     this._hp = hp;
     this.delay = 0;
+    this.sickness = 0;
 }
 
 Player.prototype = new ThingInATile();
 
 Player.prototype.act = function() {
+    Game.engine.lock();
+    window.addEventListener("keydown", this);
     if (this.delay > 0) {
         this.delay -= 1;
-    } else {
-        Game.engine.lock();
-        window.addEventListener("keydown", this);
+        this.finishTurn();
     }
 }
 
@@ -368,24 +378,29 @@ Player.prototype.handleEvent = function(e) {
         this._attemptMovement(ROT.DIRS[8][movementKeymap[code]]);
     } else if (e.keyCode == 190) {
         // . (wait)
-        window.removeEventListener("keydown", this);
-        Game.engine.unlock();
+        this.finishTurn()
     } else if (e.keyCode == 32) {
         event.preventDefault()
         // Spacebar (worldswap)
-        if (!this.canSwapWorld()) {
+        if (!this.canSwapWorldHere()) {
             Game.logMessage("You're unable to phase to the other world in this location.")
+            return;
+        } else if (!this.readyToSwap()) {
+            Game.logMessage("You're still recovering from your last swap.")
             return;
         }
         Game.swapWorld();
-        Game._drawUI();
-        window.removeEventListener("keydown", this);
-        Game.engine.unlock();
+        this.sickness = 6;
+        this.finishTurn();
     }
 }
 
-Player.prototype.canSwapWorld = function() {
+Player.prototype.canSwapWorldHere = function() {
     return Game.getTile(this._x, this._y).isWalkable(Game.otherWorld());
+}
+
+Player.prototype.readyToSwap = function() {
+    return this.sickness == 0;
 }
 
 Player.prototype._attemptMovement = function(dir) {
@@ -411,8 +426,7 @@ Player.prototype._doMovement = function(newX, newY) {
 
     Game.getTile(this._x, this._y).trigger();
 
-    window.removeEventListener("keydown", this);
-    Game.engine.unlock();
+    this.finishTurn();
 }
 
 Player.prototype.takeHit = function(damage) {
@@ -424,11 +438,19 @@ Player.prototype.takeHit = function(damage) {
 Player.prototype._doAttack = function(monster) {
     monster.takeHit(1);
     Game.logMessage("You hit the monster!");
-    window.removeEventListener("keydown", this);
-    Game.engine.unlock();
+    this.finishTurn();
 }
 
 Player.prototype._draw = function() {
     Game.drawCharacterByWorld(this._x, this._y, "@", "#fff", "#000",
                                                 "@", "#000", "#fff");
+}
+
+Player.prototype.finishTurn = function() {
+    if (this.sickness > 0) {
+        this.sickness -= 1;
+    }
+    Game._drawUI();
+    window.removeEventListener("keydown", this);
+    Game.engine.unlock();
 }
