@@ -81,7 +81,8 @@ var Game = {
         }
         this._createPlayer(20,5);
         this._createMonster(7,7,3, Shade);
-        this._createMonster(10,5,5, IncreasingStrengthMonster);
+        this._createMonster(10,5,5, Mutant);
+        this._createMonster(30,5,5, Gargoyle);
     },
 
     _createPlayer: function(x, y) {
@@ -316,11 +317,11 @@ ThingInATile.prototype.takeHit = function(damage) {
 ThingInATile.prototype.die = function() {
     Game.killMonster(this);
 }
-var IncreasingStrengthMonster = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
-IncreasingStrengthMonster.prototype = new ThingInATile();
+var Mutant = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
+Mutant.prototype = new ThingInATile();
 
-IncreasingStrengthMonster.prototype.act = function() {
-    path = Game.findPathTo(Game.player, this);
+Mutant.prototype.act = function() {
+    var path = Game.findPathTo(Game.player, this);
     if (path.length <= 1) {
         //No path! Ignore
     } else if (path.length == 2) {
@@ -336,7 +337,7 @@ IncreasingStrengthMonster.prototype.act = function() {
     }
 }
 
-IncreasingStrengthMonster.prototype._draw = function() {
+Mutant.prototype._draw = function() {
     Game.drawCharacterByWorld(this._x, this._y, "m", "#fff", "#000",
                                                 "M", "#000", "#fff");
 }
@@ -345,7 +346,7 @@ var Shade = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
 Shade.prototype = new ThingInATile();
 
 Shade.prototype.act = function() {
-    path = Game.findPathTo(Game.player, this);
+    var path = Game.findPathTo(Game.player, this);
     if (path.length <= 1) {
         //No path! Ignore
     } else if (path.length == 2) {
@@ -368,6 +369,29 @@ Shade.prototype._draw = function() {
     } else {
         Game.getTile(this._x, this._y).draw();
     }
+}
+
+var Gargoyle = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
+Gargoyle.prototype = new ThingInATile();
+Gargoyle.prototype.act = function() {
+    if (Game.currentWorld == 1) {
+        return;
+    }
+    var path = Game.findPathTo(Game.player, this);
+
+    if (path.length <= 1) {
+        //No path! Ignore
+    } else if (path.length == 2) {
+        Game.logMessage("The Gargoyle hits you");
+        Game.player.takeHit(2);
+    } else {
+        this.stepTowardsPlayer(path);
+    }
+}
+
+Gargoyle.prototype._draw = function() {
+    Game.drawCharacterByWorld(this._x, this._y, "o", "#333", "#aaa",
+                                                "8", "#aaa", "#333");
 }
 
 var Player = function(x, y, hp) {
