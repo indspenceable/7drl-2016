@@ -80,8 +80,8 @@ var Game = {
             }
         }
         this._createPlayer(20,5);
-        this._createMonster(7,7,3);
-        this._createMonster(10,5,5);
+        this._createMonster(7,7,3, Shade);
+        this._createMonster(10,5,5, IncreasingStrengthMonster);
     },
 
     _createPlayer: function(x, y) {
@@ -90,8 +90,8 @@ var Game = {
         this.scheduler.add(this.player, true);
     },
 
-    _createMonster: function(x,y,hp) {
-        var monster = new Monster(x,y,hp);
+    _createMonster: function(x,y,hp,type) {
+        var monster = new type(x,y,hp);
         this.entities.push(monster);
         this.scheduler.add(monster, true);
     },
@@ -284,27 +284,8 @@ var ThingInATile = function(x, y, hp) {
     this._hp = hp;
 }
 
-var Monster = function(x, y, hp) {
-    this._x = x;
-    this._y = y;
-    this._hp = hp;
-}
-
-Monster.prototype = new ThingInATile();
-
-Monster.prototype.act = function() {
-    path = Game.findPathTo(Game.player, this);
-    if (path.length <= 1) {
-        //No path! Ignore
-    } else if (path.length == 2) {
-        Game.logMessage("Monster attacks!");
-        Game.player.takeHit(1);
-    } else {
-        this.stepTowardsPlayer(path);
-    }
-}
-
-Monster.prototype.stepTowardsPlayer = function(path) {
+// Don't call this on player! lul
+ThingInATile.prototype.stepTowardsPlayer = function(path) {
     if (path === undefined) {
         path = Game.findPathTo(Game.player, this);
     }
@@ -321,11 +302,6 @@ Monster.prototype.stepTowardsPlayer = function(path) {
     this._draw();
 }
 
-Monster.prototype._draw = function() {
-    Game.drawCharacterByWorld(this._x, this._y, "m", "#fff", "#000",
-                                                "M", "#000", "#fff");
-}
-
 ThingInATile.prototype.isAt = function(x,y) {
     return x == this._x && y == this._y;
 }
@@ -337,8 +313,61 @@ ThingInATile.prototype.takeHit = function(damage) {
     }
 }
 
-Monster.prototype.die = function() {
+ThingInATile.prototype.die = function() {
     Game.killMonster(this);
+}
+var IncreasingStrengthMonster = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
+IncreasingStrengthMonster.prototype = new ThingInATile();
+
+IncreasingStrengthMonster.prototype.act = function() {
+    path = Game.findPathTo(Game.player, this);
+    if (path.length <= 1) {
+        //No path! Ignore
+    } else if (path.length == 2) {
+        if (Game.currentWorld == 0) {
+            Game.logMessage("The wimpy monster hits you!");
+            Game.player.takeHit(1);
+        } else {
+            Game.logMessage("The massive mutant hits you!");
+            Game.player.takeHit(3);
+        }
+    } else {
+        this.stepTowardsPlayer(path);
+    }
+}
+
+IncreasingStrengthMonster.prototype._draw = function() {
+    Game.drawCharacterByWorld(this._x, this._y, "m", "#fff", "#000",
+                                                "M", "#000", "#fff");
+}
+
+var Shade = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
+Shade.prototype = new ThingInATile();
+
+Shade.prototype.act = function() {
+    path = Game.findPathTo(Game.player, this);
+    if (path.length <= 1) {
+        //No path! Ignore
+    } else if (path.length == 2) {
+        if (Game.currentWorld == 0) {
+            Game.logMessage("Something hits you");
+            Game.player.takeHit(2);
+        } else {
+            Game.logMessage("The shade hits you!");
+            Game.player.takeHit(1);
+        }
+    } else {
+        this.stepTowardsPlayer(path);
+    }
+}
+
+Shade.prototype._draw = function() {
+    if (Game.currentWorld == 1) {
+        Game.drawCharacterByWorld(this._x, this._y, "_", "#fff", "#000",
+                                                    "S", "#000", "#fff");
+    } else {
+        Game.getTile(this._x, this._y).draw();
+    }
 }
 
 var Player = function(x, y, hp) {
