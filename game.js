@@ -331,7 +331,7 @@ Mutant.prototype.act = function() {
             Game.player.takeHit(1);
         } else {
             Game.logMessage("The massive mutant hits you!");
-            Game.player.takeHit(3);
+            Game.player.takeHit(2);
         }
     } else {
         this.stepTowardsPlayer(path);
@@ -384,7 +384,7 @@ Gargoyle.prototype.act = function() {
         //No path! Ignore
     } else if (path.length == 2) {
         Game.logMessage("The Gargoyle hits you");
-        Game.player.takeHit(2);
+        Game.player.takeHit(1);
     } else {
         this.stepTowardsPlayer(path);
     }
