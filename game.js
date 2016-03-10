@@ -81,6 +81,7 @@ var Game = {
         }
         this._createPlayer(20,5);
         this._createMonster(7,7,3, Shade);
+        this._createMonster(7,5,3, Bobomb);
         this._createMonster(10,5,5, Mutant);
         this._createMonster(30,5,5, Gargoyle);
         this._createMonster(3,5,5, Bowyer);
@@ -294,12 +295,15 @@ ThingInATile.prototype.stepTowardsPlayer = function(path) {
     if (path.length < 3) {
         return;
     }
+    this.moveInstantlyToAndRedraw(path[1][0], path[1][1]);
+}
+
+ThingInATile.prototype.moveInstantlyToAndRedraw = function(x,y) {
     var oldX = this._x;
     var oldY = this._y;
 
-    var xy = path[1];
-    this._x = xy[0];
-    this._y = xy[1]
+    this._x = x;
+    this._y = y;
     Game.drawMapTileAt(oldX, oldY);
     this._draw();
 }
@@ -342,6 +346,9 @@ Mutant.prototype._draw = function() {
     Game.drawCharacterByWorld(this._x, this._y, "m", "#fff", "#000",
                                                 "M", "#000", "#fff");
 }
+Mutant.prototype.name = function() {
+    return "Mutant";
+}
 
 var Shade = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
 Shade.prototype = new ThingInATile();
@@ -370,6 +377,10 @@ Shade.prototype._draw = function() {
     } else {
         Game.getTile(this._x, this._y).draw();
     }
+}
+
+Shade.prototype.name = function() {
+    return "Shade";
 }
 
 var Gargoyle = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
@@ -402,7 +413,9 @@ Gargoyle.prototype.takeHit = function(damage) {
     }
 }
 
-// TODO - a bombomb that runs towards/away from you depending on the world.
+Gargoyle.prototype.name = function() {
+    return "Gargoyle";
+}
 
 var Bowyer = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
 Bowyer.prototype = new ThingInATile();
@@ -429,6 +442,98 @@ Bowyer.prototype._draw = function() {
     Game.drawCharacterByWorld(this._x, this._y, "}", "#39a", "#222",
                                                 ")", "#a93", "#222");
 }
+
+Bowyer.prototype.name = function() {
+    return "Bowyer";
+}
+
+var Bobomb = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; this.countdown = 5;}
+Bobomb.prototype = new ThingInATile();
+Bobomb.prototype.act = function() {
+    if (this.countdown > 0) {
+        this.countdown -= 1;
+    }
+    if (this.countdown == 0) {
+        this.explode();
+        return;
+    }
+
+    var dx = Game.player._x - this._x;
+    var dy = Game.player._y - this._y;
+
+    var mult = Game.currentWorld == 0 ? -1 : 1;
+    var choices = [
+        [dx/Math.abs(dx)*mult, 0],
+        [0, dy/Math.abs(dy)*mult],
+    ]
+    // Reverse our order
+    if (Math.abs(dy) > Math.abs(dx)) {
+        choices = [choices[1], choices[0]];
+    }
+    for (var i = 0; i < choices.length; i += 1) {
+        var targetX = this._x+choices[i][0];
+        var targetY = this._y+choices[i][1];
+        if (!(isNaN(targetX) || isNaN(targetY)) && Game.getTile(targetX, targetY).isWalkable()) {
+            this.moveInstantlyToAndRedraw(targetX, targetY);
+            return;
+        }
+    }
+    // Uh oh, we're stuck!
+}
+
+Bobomb.prototype._draw = function() {
+    Game.drawCharacterByWorld(this._x, this._y, "*", "#f22", "#000",
+                                                "*", "#f22", "#000");
+}
+
+Bobomb.prototype.explode = function() {
+    Game.engine.lock();
+    var that = this;
+    var delays = [100,200,300]
+    for (var i = 0; i < 3; i+=1) {
+        setTimeout(function() {
+            that.displayExplosion();
+        }, delays[i]);
+    }
+    setTimeout(function() {
+        that.die();
+        for (var x = -1; x < 2; x += 1) {
+            for (var y = -1; y < 2; y += 1) {
+                var monst = Game.monsterAt(that._x + x, that._y + y);
+                if (monst !== undefined) {
+                    Game.logMessage("The " + monst.name() + " is caught in the explosion!");
+                    monst.takeHit(7);
+                }
+            }
+        }
+        Game._redrawMap();
+        Game.engine.unlock();
+    }, 400);
+}
+
+Bobomb.prototype.displayExplosion = function() {
+    for (var x = -1; x < 2; x += 1) {
+        for (var y = -1; y < 2; y += 1) {
+            fgcolor = ROT.Color.toRGB([
+                Math.floor(Math.random()*50) + 200,
+                Math.floor(Math.random()*50),
+                Math.floor(Math.random()*50)
+            ]);
+            bgcolor = ROT.Color.toRGB([
+                Math.floor(Math.random()*50) + 150,
+                Math.floor(Math.random()*25),
+                Math.floor(Math.random()*25)
+            ]);
+            Game.drawCharacterByWorld(this._x+x, this._y+y, "*", fgcolor, bgcolor,
+                                                            "*", fgcolor, bgcolor);
+        }
+    }
+}
+
+Bobomb.prototype.name = function() {
+    return "Bobomb";
+}
+
 
 var Player = function(x, y, hp) {
     this._x = x;
@@ -526,7 +631,7 @@ Player.prototype.takeHit = function(damage) {
 
 Player.prototype._doAttack = function(monster) {
     monster.takeHit(1);
-    Game.logMessage("You hit the monster!");
+    Game.logMessage("You hit the "+monster.name()+"!");
     this.finishTurn();
 }
 
