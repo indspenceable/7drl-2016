@@ -76,7 +76,8 @@ var Game = {
         ]
         for (var y = 0; y < this.map.length; y+=1) {
             for (var x = 0; x < this.map[0].length; x+=1) {
-                this.map[y][x] = new Tile(x, y, this.map[y][x]);
+                var tileType = [EmptySpaceTile, WallTile, MuckTile, AppearingWallTile][this.map[y][x]];
+                this.map[y][x] = new tileType(x, y);
             }
         }
         this._createPlayer(20,5);
@@ -233,52 +234,77 @@ var Game = {
     }
 };
 
-var Tile = function(x,y,terrain) {
+var Tile = function() {}
+Tile.prototype.trigger = function() {}
+
+var EmptySpaceTile = function(x,y) {
     this.x = x;
     this.y = y;
-    this.terrain = terrain;
 }
 
-Tile.prototype.draw = function() {
-    var world1Tiles = [
-        ['.', '#f99', '#000'],
-        ['#', '#f99', '#000'],
-        ['~', '#f99', '#922'],
-        ['_', '#555', '#000']
-    ][this.terrain];
-    var world2Tiles = [
-        [' ', '#000', '#99f'],
-        ['U', '#000', '#99f'],
-        ['~', '#9f9', '#99f'],
-        [' ', '#fff', '#222']
-    ][this.terrain];
-
-    // Draw the tile correctly, accounting for which world we're in.
-    // Game.display.draw(x, y, chrData[0], chrData[1], chrData[2]);
-
-    Game.drawCharacterByWorld(this.x, this.y, world1Tiles[0], world1Tiles[1], world1Tiles[2],
-                                              world2Tiles[0], world2Tiles[1], world2Tiles[2]);
+EmptySpaceTile.prototype = new Tile()
+EmptySpaceTile.prototype.draw = function() {
+    Game.drawCharacterByWorld(this.x, this.y, '.', '#f99', '#000',
+                                              ' ', '#000', '#99f');
+}
+EmptySpaceTile.prototype.isWalkable = function(world) {
+    return true;
 }
 
-Tile.prototype.isWalkable = function(world) {
+var WallTile = function(x,y) {
+    this.x = x;
+    this.y = y;
+}
+
+WallTile.prototype = new Tile()
+WallTile.prototype.draw = function() {
+    Game.drawCharacterByWorld(this.x, this.y, '#', '#f99', '#000',
+                                              'U', '#000', '#99f');
+}
+WallTile.prototype.isWalkable = function(world) {
+    return false;
+}
+
+var MuckTile = function(x,y) {
+    this.x = x;
+    this.y = y;
+}
+
+MuckTile.prototype = new Tile()
+MuckTile.prototype.draw = function() {
+    Game.drawCharacterByWorld(this.x, this.y, '~', '#f99', '#922',
+                                              '~', '#9f9', '#99f');
+}
+MuckTile.prototype.isWalkable = function(world) {
+    return true;
+}
+MuckTile.prototype.trigger = function() {
+    if (Game.currentWorld == 0) {
+        Game.logMessage("the lava singes you!");
+        Game.player.takeHit(1);
+    } else {
+        Game.logMessage("You're bogged down in the slime!")
+        Game.player.delay += 1;
+    }
+}
+
+
+var AppearingWallTile = function(x,y) {
+    this.x = x;
+    this.y = y;
+}
+
+AppearingWallTile.prototype = new Tile()
+AppearingWallTile.prototype.draw = function() {
+    Game.drawCharacterByWorld(this.x, this.y, '_', '#555', '#000',
+                                              ' ', '#fff', '#222');
+}
+
+AppearingWallTile.prototype.isWalkable = function(world) {
     if (world === undefined) {
         world = Game.currentWorld;
     }
-    return this.terrain == 0 || this.terrain == 2 || (this.terrain == 3 && world == 0);
-}
-
-Tile.prototype.trigger = function() {
-    switch(this.terrain) {
-        case 2:
-            if (Game.currentWorld == 0) {
-                Game.logMessage("the lava singes you!");
-                Game.player.takeHit(1);
-            } else {
-                Game.logMessage("You're bogged down in the slime!")
-                Game.player.delay += 1;
-            }
-        break;
-    }
+    return world == 0;
 }
 
 var ThingInATile = function(x, y, hp) {
