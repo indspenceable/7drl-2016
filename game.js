@@ -8,6 +8,8 @@ var Game = {
     currentWorld: 0,
     messages: ["Back log of messages!", "Which we should show"],
     maxHp: 15,
+    visibleTiles: [],
+    seenTiles: {},
 
     init: function() {
         this.display = new ROT.Display({
@@ -43,6 +45,9 @@ var Game = {
     },
 
     getTile: function(x, y) {
+        if (y < 0 || y >= this.map.length || x < 0 || x >= this.map[0].length) {
+            return undefined;
+        }
         return this.map[y][x];
     },
 
@@ -58,8 +63,8 @@ var Game = {
             [1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
-            [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,0,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,2,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1,2,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,2,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -76,7 +81,9 @@ var Game = {
         ]
         for (var y = 0; y < this.map.length; y+=1) {
             for (var x = 0; x < this.map[0].length; x+=1) {
-                var tileType = [EmptySpaceTile, WallTile, MuckTile, AppearingWallTile][this.map[y][x]];
+                var tileType = [
+                    EmptySpaceTile, WallTile, MuckTile, AppearingWallTile, IceTile
+                ][this.map[y][x]];
                 this.map[y][x] = new tileType(x, y);
             }
         }
@@ -104,7 +111,7 @@ var Game = {
     drawMapTileAt: function(x,y) {
         var m = this.monsterAt(x,y);
         if (m !== undefined) {
-            m._draw();
+            m.draw();
             return;
         }
 
@@ -141,14 +148,41 @@ var Game = {
     _drawWholeMap: function() {
         for (var y = 0; y < this.map.length; y++) {
             for (var x = 0; x < this.map[0].length; x++) {
-                this.drawMapTileAt(x,y)
+                if (this._canSee(x,y)) {
+                    this.drawMapTileAt(x,y)
+                } else if (this._hasSeen(x,y)) {
+                    this.getTile(x,y).drawFromMemory();
+                } else {
+                    this.display.draw(x,y,"/");
+                }
             }
         }
     },
 
     _redrawMap: function() {
+        this._calculateFOV();
         this._drawWholeMap();
         this.player._draw();
+    },
+
+    _canSee: function(x,y) {
+        return this.visibleTiles[[x,y]] === true;
+    },
+    _hasSeen: function(x,y) {
+        return this.seenTiles[[x,y]] === true;
+    },
+
+    _calculateFOV: function() {
+        var lightPasses = function(x,y) {
+            var tile = Game.getTile(x,y);
+            return tile !== undefined && tile.canSeeThrough();
+        }
+        var fov = new ROT.FOV.PreciseShadowcasting(lightPasses);
+        this.visibleTiles = [];
+        fov.compute(this.player._x, this.player._y, 5, function(x,y,r,canSee) {
+            Game.visibleTiles[[x,y]] = true;
+            Game.seenTiles[[x,y]] = true;
+        });
     },
 
     _drawMapUIDivider: function() {
@@ -234,19 +268,31 @@ var Game = {
     }
 };
 
-var Tile = function() {}
+var Tile = function(c1,fg1,bg1,c2,fg2,bg2) {
+    this.c1 = c1;
+    this.fg1 = fg1;
+    this.bg1 = bg1;
+    this.c2 = c2;
+    this.fg2 = fg2;
+    this.bg2 = bg2;
+}
 Tile.prototype.trigger = function() {}
+Tile.prototype.canSeeThrough = function() {return true;}
+Tile.prototype.draw = function() {
+    Game.drawCharacterByWorld(this.x, this.y, this.c1, this.fg1, this.bg1,
+                                              this.c2, this.fg2, this.bg2);
+}
+Tile.prototype.drawFromMemory = function() {
+    Game.drawCharacterByWorld(this.x, this.y, this.c1, "#ccc", "#222",
+                                              this.c2, "#222", "#ccc");
+}
 
 var EmptySpaceTile = function(x,y) {
     this.x = x;
     this.y = y;
 }
 
-EmptySpaceTile.prototype = new Tile()
-EmptySpaceTile.prototype.draw = function() {
-    Game.drawCharacterByWorld(this.x, this.y, '.', '#f99', '#000',
-                                              ' ', '#000', '#99f');
-}
+EmptySpaceTile.prototype = new Tile('.', '#f99', '#000', ' ', '#000', '#99f')
 EmptySpaceTile.prototype.isWalkable = function(world) {
     return true;
 }
@@ -256,12 +302,11 @@ var WallTile = function(x,y) {
     this.y = y;
 }
 
-WallTile.prototype = new Tile()
-WallTile.prototype.draw = function() {
-    Game.drawCharacterByWorld(this.x, this.y, '#', '#f99', '#000',
-                                              'U', '#000', '#99f');
-}
+WallTile.prototype = new Tile('#', '#f99', '#000', 'U', '#000', '#99f')
 WallTile.prototype.isWalkable = function(world) {
+    return false;
+}
+WallTile.prototype.canSeeThrough = function() {
     return false;
 }
 
@@ -270,11 +315,7 @@ var MuckTile = function(x,y) {
     this.y = y;
 }
 
-MuckTile.prototype = new Tile()
-MuckTile.prototype.draw = function() {
-    Game.drawCharacterByWorld(this.x, this.y, '~', '#f99', '#922',
-                                              '~', '#9f9', '#99f');
-}
+MuckTile.prototype = new Tile('~', '#f99', '#922', '~', '#9f9', '#99f')
 MuckTile.prototype.isWalkable = function(world) {
     return true;
 }
@@ -294,12 +335,7 @@ var AppearingWallTile = function(x,y) {
     this.y = y;
 }
 
-AppearingWallTile.prototype = new Tile()
-AppearingWallTile.prototype.draw = function() {
-    Game.drawCharacterByWorld(this.x, this.y, '_', '#555', '#000',
-                                              ' ', '#fff', '#222');
-}
-
+AppearingWallTile.prototype = new Tile('_', '#555', '#000',' ', '#fff', '#222')
 AppearingWallTile.prototype.isWalkable = function(world) {
     if (world === undefined) {
         world = Game.currentWorld;
@@ -307,10 +343,35 @@ AppearingWallTile.prototype.isWalkable = function(world) {
     return world == 0;
 }
 
-var ThingInATile = function(x, y, hp) {
-    this._x = x;
-    this._y = y;
-    this._hp = hp;
+var IceTile = function(x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+IceTile.prototype = new Tile(' ', '#599', '#fff', '_', '#244', '#599')
+IceTile.prototype.isWalkable = function(world) {
+    return true;
+}
+
+IceTile.prototype.trigger = function() {
+    if (Game.currentWorld == 0) {
+        Game.logMessage("You're encased in a cloud of steam!");
+    } else {
+        Game.logMessage("You slide on the ice. But not really.")
+    }
+}
+IceTile.prototype.canSeeThrough = function() {
+    return Game.currentWorld == 1;
+}
+
+
+var ThingInATile = function(c1,fg1,bg1,c2,fg2,bg2) {
+    this.c1 = c1;
+    this.fg1 = fg1;
+    this.bg1 = bg1;
+    this.c2 = c2;
+    this.fg2 = fg2;
+    this.bg2 = bg2;
 }
 
 // Don't call this on player! lul
@@ -330,8 +391,12 @@ ThingInATile.prototype.moveInstantlyToAndRedraw = function(x,y) {
 
     this._x = x;
     this._y = y;
-    Game.drawMapTileAt(oldX, oldY);
-    this._draw();
+    // if (Game._canSee(oldX, oldY)) {
+        // Game.drawMapTileAt(oldX, oldY);
+    // }
+    Game._redrawMap();
+
+    this.draw();
 }
 
 ThingInATile.prototype.isAt = function(x,y) {
@@ -348,8 +413,19 @@ ThingInATile.prototype.takeHit = function(damage) {
 ThingInATile.prototype.die = function() {
     Game.killMonster(this);
 }
+
+ThingInATile.prototype.draw = function() {
+    // if (Game._canSee(this._x, this._y)) {
+        console.log("can see!");
+        Game.drawCharacterByWorld(this.x, this.y, this.c1, this.fg1, this.bg1,
+                                                  this.c2, this.fg2, this.bg2);
+    // } else {
+        // console.log('can"t see')
+    // }
+}
+
 var Mutant = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
-Mutant.prototype = new ThingInATile();
+Mutant.prototype = new ThingInATile("m", "#fff", "#000", "M", "#000", "#fff");
 
 Mutant.prototype.act = function() {
     var path = Game.findPathTo(Game.player, this);
@@ -368,16 +444,12 @@ Mutant.prototype.act = function() {
     }
 }
 
-Mutant.prototype._draw = function() {
-    Game.drawCharacterByWorld(this._x, this._y, "m", "#fff", "#000",
-                                                "M", "#000", "#fff");
-}
 Mutant.prototype.name = function() {
     return "Mutant";
 }
 
 var Shade = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
-Shade.prototype = new ThingInATile();
+Shade.prototype = new ThingInATile("_", "#fff", "#000", "S", "#000", "#fff");
 
 Shade.prototype.act = function() {
     var path = Game.findPathTo(Game.player, this);
@@ -396,10 +468,9 @@ Shade.prototype.act = function() {
     }
 }
 
-Shade.prototype._draw = function() {
+Shade.prototype.draw = function() {
     if (Game.currentWorld == 1) {
-        Game.drawCharacterByWorld(this._x, this._y, "_", "#fff", "#000",
-                                                    "S", "#000", "#fff");
+        return ThingInATile.prototype.draw.call(this);
     } else {
         Game.getTile(this._x, this._y).draw();
     }
@@ -410,7 +481,7 @@ Shade.prototype.name = function() {
 }
 
 var Gargoyle = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
-Gargoyle.prototype = new ThingInATile();
+Gargoyle.prototype = new ThingInATile("o", "#333", "#aaa", "8", "#aaa", "#333");
 Gargoyle.prototype.act = function() {
     if (Game.currentWorld == 1) {
         return;
@@ -427,10 +498,6 @@ Gargoyle.prototype.act = function() {
     }
 }
 
-Gargoyle.prototype._draw = function() {
-    Game.drawCharacterByWorld(this._x, this._y, "o", "#333", "#aaa",
-                                                "8", "#aaa", "#333");
-}
 Gargoyle.prototype.takeHit = function(damage) {
     if (Game.currentWorld == 0) {
         return ThingInATile.prototype.takeHit.call(this, damage);
@@ -444,7 +511,7 @@ Gargoyle.prototype.name = function() {
 }
 
 var Bowyer = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; }
-Bowyer.prototype = new ThingInATile();
+Bowyer.prototype = new ThingInATile("}", "#39a", "#222", ")", "#a93", "#222");
 
 Bowyer.prototype.act = function() {
     var range = (Game.currentWorld == 1) ? 1 : 5;
@@ -464,17 +531,12 @@ Bowyer.prototype.act = function() {
     }
 }
 
-Bowyer.prototype._draw = function() {
-    Game.drawCharacterByWorld(this._x, this._y, "}", "#39a", "#222",
-                                                ")", "#a93", "#222");
-}
-
 Bowyer.prototype.name = function() {
     return "Bowyer";
 }
 
 var Bobomb = function(x, y, hp) { this._x = x; this._y = y; this._hp = hp; this.countdown = 5;}
-Bobomb.prototype = new ThingInATile();
+Bobomb.prototype = new ThingInATile("*", "#f22", "#000",  "*", "#f22", "#000");
 Bobomb.prototype.act = function() {
     if (this.countdown > 0) {
         this.countdown -= 1;
@@ -505,11 +567,6 @@ Bobomb.prototype.act = function() {
         }
     }
     // Uh oh, we're stuck!
-}
-
-Bobomb.prototype._draw = function() {
-    Game.drawCharacterByWorld(this._x, this._y, "*", "#f22", "#000",
-                                                "*", "#f22", "#000");
 }
 
 Bobomb.prototype.explode = function() {
@@ -637,15 +694,10 @@ Player.prototype._attemptMovement = function(dir) {
 }
 
 Player.prototype._doMovement = function(newX, newY) {
-    var oldX = this._x;
-    var oldY = this._y;
     this._x = newX;
     this._y = newY;
-    Game.drawMapTileAt(oldX, oldY);
-    this._draw();
-
+    Game._redrawMap();
     Game.getTile(this._x, this._y).trigger();
-
     this.finishTurn();
 }
 
